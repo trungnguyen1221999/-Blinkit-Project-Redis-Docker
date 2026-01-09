@@ -1,0 +1,34 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+@theme {
+  --color-primary-100: #ffc929;
+  --color-primary-200: #ffb900;
+  --color-secondary-100: #b1ca78;
+  --color-secondary-200: #00b050;
+
+  --font-inter: "Inter", sans-serif;
+}
+
+body {
+  @apply bg-slate-100;
+  font-family: "Inter", sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+}
+button {
+  cursor: pointer;
+}
+/* Chrome, Edge, Safari */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-inner-spin-button,
+input[type="password"]::-webkit-outer-spin-button,
+input[type="password"]::-webkit-clear-button,
+input[type="password"]::-webkit-password-toggle-button {
+  display: none;
+}
+
+/* Cách đơn giản hơn: chỉ với Chrome/Safari */
+input[type="password"]::-webkit-password-toggle-button {
+  display: none;
+}

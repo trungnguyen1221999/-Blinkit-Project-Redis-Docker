@@ -1,0 +1,3 @@
+export const FINNISH_CITIES = [
+  "Alavus", "Espoo", "Forssa", "Hämeenlinna", "Helsinki", "Hollola", "Hyvinkää", "Iisalmi", "Imatra", "Joensuu", "Järvenpää", "Kajaani", "Kaarina", "Kankaanpää", "Kauhajoki", "Kemijärvi", "Kemi", "Kempele", "Kerava", "Kirkkonummi", "Kokkola", "Kotka", "Kouvola", "Kuopio", "Lahti", "Lapua", "Lappeenranta", "Lohja", "Mäntsälä", "Mikkeli", "Nokia", "Nurmijärvi", "Orivesi", "Oulu", "Pietarsaari", "Pori", "Porvoo", "Rauma", "Raisio", "Riihimäki", "Rovaniemi", "Salo", "Sastamala", "Savonlinna", "Seinäjoki", "Sipoo", "Tampere", "Tornio", "Tuusula", "Turku", "Valkeakoski", "Vaasa", "Vantaa", "Vihti", "Varkaus", "Ylöjärvi", "Äänekoski"
+];
