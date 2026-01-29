@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Users,
@@ -8,26 +8,126 @@ import {
   Calendar,
   AlertCircle,
   ListOrdered,
-  ChartColumnStacked
+  ChartColumnStacked,
+  ShoppingCart
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getAllProductsApi } from '../../api/adminApi/productApi';
 import { getCategoriesApi } from '../../api/categoryApi/categoryApi';
 import { getRevenueApi } from '../../api/adminApi/revenueApi';
+import { getNotificationsApi } from '../../api/notificationApi';
 import StatCard from './dashboard/StatCard';
+import { toast } from 'react-toastify';
+import { z } from 'zod';
+
+// Notification Schema with Zod
+const NotificationSchema = z.object({
+  id: z.string(),
+  type: z.enum(['new_order', 'revenue_update', 'low_stock']),
+  title: z.string(),
+  message: z.string(),
+  orderId: z.string().optional(),
+  amount: z.number().optional(),
+  timestamp: z.string(),
+  read: z.boolean(),
+  priority: z.enum(['low', 'medium', 'high']),
+  userName: z.string().optional().nullable()
+});
 
 const AdminDashboard = () => {
+  const lastNotificationCount = useRef(0);
+  const lastRevenueAmount = useRef(0);
+  
   // Queries for data
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
     queryFn: getAllProductsApi,
   });
 
-
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategoriesApi,
   });
+
+  const { data: revenue, refetch: refetchRevenue } = useQuery({
+    queryKey: ['revenue', 'day'],
+    queryFn: () => getRevenueApi('day'),
+  });
+
+  // Notifications query (only refetch manually when needed)
+  const { data: notificationData, refetch: refetchNotifications } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: getNotificationsApi,
+    staleTime: 30000, // Cache for 30 seconds
+  });
+
+  // Watch for revenue changes and check notifications when it changes
+  useEffect(() => {
+    if (revenue) {
+      const currentTotal = revenue.totalRevenue || 0;
+      
+      // If revenue changed (indicating new order), check notifications
+      if (lastRevenueAmount.current !== 0 && currentTotal > lastRevenueAmount.current) {
+        console.log("💰 Revenue increased - checking for new notifications...");
+        refetchNotifications();
+      }
+      
+      lastRevenueAmount.current = currentTotal;
+    }
+  }, [revenue, refetchNotifications]);
+  // Handle new notifications with Zod validation and toast
+  useEffect(() => {
+    if (notificationData?.notifications) {
+      try {
+        // Validate with Zod
+        const validNotifications = z.array(NotificationSchema).parse(notificationData.notifications);
+        
+        // Check for new unread notifications
+        const unreadNotifications = validNotifications.filter(n => !n.read);
+        
+        if (unreadNotifications.length > lastNotificationCount.current) {
+          // Show toast for new notifications
+          const newNotifications = unreadNotifications.slice(lastNotificationCount.current);
+          
+          newNotifications.forEach((notification) => {
+            // Format time
+            const time = new Date(notification.timestamp).toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            
+            // Format user name
+            const userName = notification.userName || 'someone';
+            
+            // Format message
+            const message = `(${time}) ${userName} placed new order - Total: €${notification.amount?.toFixed(2) || '0.00'}`;
+            
+            const toastOptions = {
+              position: "top-right" as const,
+              autoClose: 6000,
+              hideProgressBar: false,
+              closeOnClick: true,
+              pauseOnHover: true,
+              draggable: true,
+            };
+
+            // Always show as success (green) with shopping cart icon
+            toast.success(
+              <div className="flex items-center gap-2">
+                <ShoppingCart size={16} />
+                <span>{message}</span>
+              </div>, 
+              toastOptions
+            );
+          });
+        }
+        
+        lastNotificationCount.current = unreadNotifications.length;
+      } catch (error) {
+        console.error('❌ Notification validation error:', error);
+      }
+    }
+  }, [notificationData]);
 
 
   const [filterType, setFilterType] = useState<'today' | 'all' | 'month' | 'year' | 'range'>('today');
@@ -96,6 +196,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-8">
+      {/* Header */}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

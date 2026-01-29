@@ -1,0 +1,49 @@
+services:
+  backend:
+    build:    
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: blinkit-backend
+    image: kainguyen1122/blinkit-docker:latest
+    depends_on:
+      - mongoBD
+      - redis
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    restart: always
+    volumes:
+      - ./:/app
+    networks:
+      - backend-networks
+
+  mongoBD:
+    image: mongo:latest
+    container_name: blinkit-mongodb
+    ports:
+      - "27018:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - mongo-data:/data/db
+    restart: always
+    networks:
+      - backend-networks
+
+  redis:
+    image: redis:latest
+    container_name: blinkit-redis
+    ports:
+      - "6380:6379"
+    restart: always
+    networks:
+      - backend-networks
+
+networks:
+  backend-networks:
+    driver: bridge
+
+volumes:
+  mongo-data:

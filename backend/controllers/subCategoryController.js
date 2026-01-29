@@ -1,12 +1,23 @@
 import { v2 as cloudinary } from "cloudinary";
 import { SubCategoryModels } from "../models/subCategoryModels.js";
+import { redisClient } from "../redisConnect.js";
 
 // Lấy danh sách tất cả subcategory
 const getSubCategories = async (req, res) => {
   try {
+    //Check Redis cache first
+    const cachedSubCategories = await redisClient.get("subcategories:all");
+    if (cachedSubCategories) {
+      console.log("🚀 Lấy subcategories từ Redis cache");
+      return res.status(200).json(JSON.parse(cachedSubCategories));
+    }
+    //If not in cache, fetch from database
+    console.log("📊 Lấy subcategories từ MongoDB");
     const subCategories = await SubCategoryModels.find()
       .populate("category", "name") // populate để lấy thông tin category
       .sort({ createdAt: -1 });
+    // Save to Redis cache with TTL 300 seconds (5 minutes)
+    await redisClient.setEx("subcategories:all", 300, JSON.stringify(subCategories, null, 2));
     res.status(200).json(subCategories);
   } catch (error) {
     console.error(error);
@@ -82,7 +93,8 @@ const createSubCategory = async (req, res) => {
         });
 
         await newSubCategory.save();
-        
+        // Delete Invalidate Redis cache
+        await redisClient.del("subcategories:all");
         // Populate category info trước khi trả về
         const populatedSubCategory = await SubCategoryModels.findById(newSubCategory._id)
           .populate("category", "name");
@@ -181,7 +193,8 @@ const updateSubCategory = async (req, res) => {
     }
 
     const updatedSubCategory = await subCategory.save();
-    
+    // Delete Invalidate Redis cache
+    await redisClient.del("subcategories:all");
     // Populate category info trước khi trả về
     const populatedSubCategory = await SubCategoryModels.findById(updatedSubCategory._id)
       .populate("category", "name");
@@ -212,6 +225,9 @@ const deleteSubCategory = async (req, res) => {
 
     // Xóa subcategory trong DB
     await SubCategoryModels.findByIdAndDelete(id);
+
+    // Delete Invalidate Redis cache
+    await redisClient.del("subcategories:all");
 
     res.status(200).json({ message: "SubCategory deleted successfully" });
   } catch (error) {

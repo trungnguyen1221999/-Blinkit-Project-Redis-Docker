@@ -1,3 +1,7 @@
+import { OrderModels } from '../models/orderModels.js';
+import { CustomerModels } from '../models/customerModels.js';
+import { publishRevenue } from '../pub/sub/publisher.js';
+
 // Create abandon order (temp order when user visits checkout)
 export const createAbandonOrder = async (req, res) => {
   try {
@@ -47,7 +51,6 @@ export const completeAbandonOrder = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
-import { OrderModels } from '../models/orderModels.js';
 
 // Create Order
 export const createOrder = async (req, res) => {
@@ -95,6 +98,17 @@ export const createOrder = async (req, res) => {
       // Nếu đã có thì push thêm order vào orders
       await CustomerModels.findByIdAndUpdate(exist._id, { $push: { orders: order._id } });
     }
+
+    // 🚀 Publish revenue update event với user name
+    let userName = null;
+    if (userId) {
+      const UserModels = (await import('../models/userModels.js')).UserModels;
+      const user = await UserModels.findById(userId);
+      userName = user?.name || user?.fullName || null;
+    }
+    
+    await publishRevenue(order._id, order.totalAmt, userName);
+
     res.status(201).json(order);
   } catch (err) {
     res.status(400).json({ error: err.message });

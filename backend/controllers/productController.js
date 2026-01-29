@@ -1,17 +1,41 @@
 import { v2 as cloudinary } from "cloudinary";
 import { ProductModels } from "../models/productModels.js";
+import { redisClient } from "../redisConnect.js";
 
 // Get all products
 const getProducts = async (req, res) => {
   try {
+    // Bước 1: Kiểm tra cache trước
+    const cachedProducts = await redisClient.get('products:all');
+    
+    if (cachedProducts) {
+      console.log('🚀 Lấy products từ Redis cache');
+      // Parse và trả về CHÍNH XÁC như database
+      return res.status(200).json(JSON.parse(cachedProducts));
+    }
+
+    // Bước 2: Nếu không có cache, lấy từ database
+    console.log('📊 Lấy products từ MongoDB');
     const products = await ProductModels.find()
       .populate("category", "name")
       .populate("SubCategory", "name")
       .sort({ createdAt: -1 });
+    
+    // Bước 3: Lưu vào cache - CHÍNH XÁC như kết quả database
+    await redisClient.setEx(
+      'products:all', 
+      300, 
+      JSON.stringify(products, null, 2) // Format đẹp để dễ nhìn trong Redis Insight
+    );
+    
+    // Trả về kết quả GIỐNG HỆT như cache
     res.status(200).json(products);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error('❌ Error in getProducts:', error);
+    res.status(500).json({ 
+      message: "Server error", 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 };
 
@@ -19,6 +43,14 @@ const getProducts = async (req, res) => {
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
+    // Check Redis cache first
+    const cachedProduct = await redisClient.get(`product:${id}`); // Sửa: dùng id thay vì req.params.id
+    if (cachedProduct){
+      console.log(`🚀 Lấy product ${id} từ Redis cache`); // Sửa: thêm ID vào log
+      return res.status(200).json(JSON.parse(cachedProduct));
+    }
+    // If not in cache, fetch from database
+    console.log(`📊 Lấy product ${id} từ MongoDB`); // Sửa: thêm ID vào log
     const product = await ProductModels.findById(id)
       .populate("category", "name")
       .populate("SubCategory", "name");
@@ -26,7 +58,7 @@ const getProductById = async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
-    
+    await redisClient.setEx(`product:${id}`, 600, JSON.stringify(product, null, 2)); // Sửa: tăng TTL lên 600s (10 phút)
     res.status(200).json(product);
   } catch (error) {
     console.error(error);
@@ -121,6 +153,8 @@ const createProduct = async (req, res) => {
     });
 
     await newProduct.save();
+    // Delete Invalidate Redis cache
+    await redisClient.del("products:all");
 
     // Populate before sending response
     const populatedProduct = await ProductModels.findById(newProduct._id)
@@ -223,7 +257,9 @@ const updateProduct = async (req, res) => {
     if (publish !== undefined) product.publish = publish === 'true' || publish === true;
 
     await product.save();
-
+    // Delete Invalidate Redis cache
+    await redisClient.del("products:all");
+    await redisClient.del(`product:${id}`);
     // Populate before sending response
     const populatedProduct = await ProductModels.findById(product._id)
       .populate("category", "name")
@@ -258,6 +294,9 @@ const deleteProduct = async (req, res) => {
 
     // Delete product from database
     await ProductModels.findByIdAndDelete(id);
+    // Delete Invalidate Redis cache
+    await redisClient.del("products:all");
+    await redisClient.del(`product:${id}`);
 
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {

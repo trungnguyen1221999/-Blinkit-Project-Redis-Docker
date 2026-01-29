@@ -1,10 +1,20 @@
 import { v2 as cloudinary } from "cloudinary";
 
 import CategoryModels from "../models/categoryModels.js";
+import { redisClient } from "../redisConnect.js";
 // Lấy danh sách tất cả category
 const getCategories = async (req, res) => {
   try {
+    // Kiểm tra cache Redis trước
+    const categoryCaches = await redisClient.get("categories:all");
+    if (categoryCaches) {
+      console.log("🚀 Lấy categories từ Redis cache");
+      return res.status(200).json(JSON.parse(categoryCaches));
+    }
+    // Nếu không có trong cache, lấy từ database
     const categories = await CategoryModels.find().sort({ createdAt: -1 });
+    // Lưu vào cache Redis với TTL 300 giây (5 phút)
+    await redisClient.setEx("categories:all", 300, JSON.stringify(categories, null, 2));
     res.status(200).json(categories);
   } catch (error) {
     console.error(error);

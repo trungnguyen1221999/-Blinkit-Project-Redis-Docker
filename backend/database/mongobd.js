@@ -9,10 +9,7 @@ export const connectDB = async () => {
       throw new Error("Thiếu DATABASE_URL trong file .env");
     }
 
-    await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(mongoURI);
 
     console.log("✅ Kết nối tới MongoDB thành công!");
   } catch (err) {

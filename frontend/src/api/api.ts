@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://blinkit-clone-d0u0.onrender.com/api",
+  baseURL: "http://103.82.24.142:5000/api", 
   timeout: 10000,
   withCredentials: true, // để gửi cookie HttpOnly
 });
